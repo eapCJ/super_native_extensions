@@ -37,8 +37,7 @@ class MenuRequest {
 
 typedef MenuProvider = FutureOr<Menu?> Function(MenuRequest request);
 
-typedef MenuConfigurationProvider = Future<MobileMenuConfiguration?> Function(
-    MobileMenuConfigurationRequest request);
+typedef MenuConfigurationProvider = Future<MobileMenuConfiguration?> Function(MobileMenuConfigurationRequest request);
 
 class DeferredMenuPreview {
   DeferredMenuPreview(this.size, this.widget);
@@ -62,17 +61,16 @@ class ContextMenuWidget extends StatelessWidget {
     this.contextMenuIsAllowed = _defaultContextMenuIsAllowed,
     MobileMenuWidgetBuilder? mobileMenuWidgetBuilder,
     DesktopMenuWidgetBuilder? desktopMenuWidgetBuilder,
+    this.allowPrimaryButton = false,
   })  : assert(previewBuilder == null || deferredPreviewBuilder == null,
             'Cannot use both previewBuilder and deferredPreviewBuilder'),
-        mobileMenuWidgetBuilder =
-            mobileMenuWidgetBuilder ?? DefaultMobileMenuWidgetBuilder.instance,
-        desktopMenuWidgetBuilder =
-            desktopMenuWidgetBuilder ?? DefaultDesktopMenuWidgetBuilder();
+        mobileMenuWidgetBuilder = mobileMenuWidgetBuilder ?? DefaultMobileMenuWidgetBuilder.instance,
+        desktopMenuWidgetBuilder = desktopMenuWidgetBuilder ?? DefaultDesktopMenuWidgetBuilder();
 
   final Widget Function(BuildContext context, Widget child)? liftBuilder;
   final Widget Function(BuildContext context, Widget child)? previewBuilder;
-  final DeferredMenuPreview Function(BuildContext context, Widget child,
-      CancellationToken cancellationToken)? deferredPreviewBuilder;
+  final DeferredMenuPreview Function(BuildContext context, Widget child, CancellationToken cancellationToken)?
+      deferredPreviewBuilder;
 
   final HitTestBehavior hitTestBehavior;
   final MenuProvider menuProvider;
@@ -80,6 +78,7 @@ class ContextMenuWidget extends StatelessWidget {
   final Widget child;
   final MobileMenuWidgetBuilder mobileMenuWidgetBuilder;
   final DesktopMenuWidgetBuilder desktopMenuWidgetBuilder;
+  final bool allowPrimaryButton;
 
   /// Base icon theme for menu icons. The size will be overridden depending
   /// on platform.
@@ -111,6 +110,7 @@ class ContextMenuWidget extends StatelessWidget {
             contextMenuIsAllowed: contextMenuIsAllowed,
             iconTheme: iconTheme,
             menuWidgetBuilder: desktopMenuWidgetBuilder,
+            allowPrimaryButton: allowPrimaryButton,
             child: child!,
           );
         }

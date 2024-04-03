@@ -4,11 +4,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
-
 import 'package:super_context_menu/src/menu_internal.dart';
 import 'package:super_context_menu/super_context_menu.dart';
 import 'package:super_native_extensions/raw_menu.dart' as raw;
-
 // ignore: implementation_imports
 import 'package:super_native_extensions/src/mutex.dart';
 
@@ -21,14 +19,15 @@ class _ContextMenuDetector extends StatefulWidget {
     required this.hitTestBehavior,
     required this.contextMenuIsAllowed,
     required this.onShowContextMenu,
+    required this.allowPrimaryButton,
     required this.child,
   });
 
   final Widget child;
   final HitTestBehavior hitTestBehavior;
   final ContextMenuIsAllowed contextMenuIsAllowed;
-  final Future<void> Function(Offset, Listenable, Function(bool))
-      onShowContextMenu;
+  final bool allowPrimaryButton;
+  final Future<void> Function(Offset, Listenable, Function(bool)) onShowContextMenu;
 
   @override
   State<StatefulWidget> createState() => _ContextMenuDetectorState();
@@ -46,6 +45,10 @@ class _ContextMenuDetectorState extends State<_ContextMenuDetector> {
   static final _mutex = Mutex();
 
   bool _acceptPrimaryButton() {
+    if (widget.allowPrimaryButton) {
+      return true;
+    }
+
     final keys = HardwareKeyboard.instance.logicalKeysPressed;
     return defaultTargetPlatform == TargetPlatform.macOS &&
         keys.length == 1 &&
@@ -56,8 +59,7 @@ class _ContextMenuDetectorState extends State<_ContextMenuDetector> {
     if (event.kind != PointerDeviceKind.mouse) {
       return false;
     }
-    if (event.buttons == kSecondaryButton ||
-        event.buttons == kPrimaryButton && _acceptPrimaryButton()) {
+    if (event.buttons == kSecondaryButton || event.buttons == kPrimaryButton && _acceptPrimaryButton()) {
       return widget.contextMenuIsAllowed(event.position);
     }
 
@@ -144,6 +146,7 @@ class DesktopContextMenuWidget extends StatelessWidget {
     required this.contextMenuIsAllowed,
     required this.menuWidgetBuilder,
     this.iconTheme,
+    this.allowPrimaryButton = false,
   });
 
   final HitTestBehavior hitTestBehavior;
@@ -151,6 +154,7 @@ class DesktopContextMenuWidget extends StatelessWidget {
   final ContextMenuIsAllowed contextMenuIsAllowed;
   final DesktopMenuWidgetBuilder menuWidgetBuilder;
   final Widget child;
+  final bool allowPrimaryButton;
 
   /// Base icon theme for menu icons. The size will be overridden depending
   /// on platform.
@@ -161,6 +165,7 @@ class DesktopContextMenuWidget extends StatelessWidget {
     return _ContextMenuDetector(
       hitTestBehavior: hitTestBehavior,
       contextMenuIsAllowed: contextMenuIsAllowed,
+      allowPrimaryButton: allowPrimaryButton,
       onShowContextMenu: (position, pointerUpListenable, onMenuresolved) async {
         await _onShowContextMenu(
           context,
@@ -183,9 +188,7 @@ class DesktopContextMenuWidget extends StatelessWidget {
     final mq = MediaQuery.of(context);
     final iconTheme = this.iconTheme ??
         const IconThemeData.fallback().copyWith(
-          color: mq.platformBrightness == Brightness.light
-              ? const Color(0xFF090909)
-              : const Color(0xFFF0F0F0),
+          color: mq.platformBrightness == Brightness.light ? const Color(0xFF090909) : const Color(0xFFF0F0F0),
         );
     return raw.MenuSerializationOptions(
       iconTheme: iconTheme,
