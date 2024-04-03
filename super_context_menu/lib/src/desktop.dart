@@ -4,11 +4,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
-
 import 'package:super_context_menu/src/menu_internal.dart';
 import 'package:super_context_menu/super_context_menu.dart';
 import 'package:super_native_extensions/raw_menu.dart' as raw;
-
 // ignore: implementation_imports
 import 'package:super_native_extensions/src/mutex.dart';
 
@@ -21,14 +19,15 @@ class _ContextMenuDetector extends StatefulWidget {
     required this.hitTestBehavior,
     required this.contextMenuIsAllowed,
     required this.onShowContextMenu,
+    required this.allowPrimaryButton,
     required this.child,
   });
 
   final Widget child;
   final HitTestBehavior hitTestBehavior;
   final ContextMenuIsAllowed contextMenuIsAllowed;
-  final Future<void> Function(Offset, Listenable, Function(bool))
-      onShowContextMenu;
+  final bool allowPrimaryButton;
+  final Future<void> Function(Offset, Listenable, Function(bool)) onShowContextMenu;
 
   @override
   State<StatefulWidget> createState() => _ContextMenuDetectorState();
@@ -46,6 +45,10 @@ class _ContextMenuDetectorState extends State<_ContextMenuDetector> {
   static final _mutex = Mutex();
 
   bool _acceptPrimaryButton() {
+    if (widget.allowPrimaryButton) {
+      return true;
+    }
+
     final keys = HardwareKeyboard.instance.logicalKeysPressed;
     return defaultTargetPlatform == TargetPlatform.macOS &&
         keys.length == 1 &&
@@ -56,8 +59,7 @@ class _ContextMenuDetectorState extends State<_ContextMenuDetector> {
     if (event.kind != PointerDeviceKind.mouse) {
       return false;
     }
-    if (event.buttons == kSecondaryButton ||
-        event.buttons == kPrimaryButton && _acceptPrimaryButton()) {
+    if (event.buttons == kSecondaryButton || event.buttons == kPrimaryButton && _acceptPrimaryButton()) {
       return widget.contextMenuIsAllowed(event.position);
     }
 
@@ -146,6 +148,8 @@ class DesktopContextMenuWidget extends StatelessWidget {
     required this.tapRegionGroupIds,
     this.writingToolsConfigurationProvider,
     this.iconTheme,
+    this.allowPrimaryButton = false,
+    this.onMenuClosed,
   });
 
   final HitTestBehavior hitTestBehavior;
@@ -154,25 +158,27 @@ class DesktopContextMenuWidget extends StatelessWidget {
   final DesktopMenuWidgetBuilder menuWidgetBuilder;
   final Set<Object> tapRegionGroupIds;
   final Widget child;
+  final bool allowPrimaryButton;
+  final VoidCallback? onMenuClosed;
 
   /// Base icon theme for menu icons. The size will be overridden depending
   /// on platform.
   final IconThemeData? iconTheme;
 
-  final WritingToolsConfiguration? Function()?
-      writingToolsConfigurationProvider;
+  final WritingToolsConfiguration? Function()? writingToolsConfigurationProvider;
 
   @override
   Widget build(BuildContext context) {
     return _ContextMenuDetector(
       hitTestBehavior: hitTestBehavior,
       contextMenuIsAllowed: contextMenuIsAllowed,
-      onShowContextMenu: (position, pointerUpListenable, onMenuResolved) async {
+      allowPrimaryButton: allowPrimaryButton,
+      onShowContextMenu: (position, pointerUpListenable, onMenuresolved) async {
         await _onShowContextMenu(
           context,
           position,
           pointerUpListenable,
-          onMenuResolved,
+          onMenuresolved,
           tapRegionGroupIds,
         );
       },
@@ -190,9 +196,7 @@ class DesktopContextMenuWidget extends StatelessWidget {
     final mq = MediaQuery.of(context);
     final iconTheme = this.iconTheme ??
         const IconThemeData.fallback().copyWith(
-          color: mq.platformBrightness == Brightness.light
-              ? const Color(0xFF090909)
-              : const Color(0xFFF0F0F0),
+          color: mq.platformBrightness == Brightness.light ? const Color(0xFF090909) : const Color(0xFFF0F0F0),
         );
     return raw.MenuSerializationOptions(
       iconTheme: iconTheme,
@@ -237,18 +241,15 @@ class DesktopContextMenuWidget extends StatelessWidget {
         }
         onMenuResolved(true);
         onShowMenu.notify();
-        final writingToolsConfiguration =
-            writingToolsConfigurationProvider?.call();
-        raw.writingToolsSuggestionCallback =
-            writingToolsConfiguration?.onSuggestion;
+        final writingToolsConfiguration = writingToolsConfigurationProvider?.call();
+        raw.writingToolsSuggestionCallback = writingToolsConfiguration?.onSuggestion;
 
         final request = raw.DesktopContextMenuRequest(
             iconTheme: serializationOptions.iconTheme,
             position: globalPosition,
             menu: handle,
             writingToolsConfiguration: switch (writingToolsConfiguration) {
-              (WritingToolsConfiguration c) =>
-                raw.WritingToolsConfiguration(rect: c.rect, text: c.text),
+              (WritingToolsConfiguration c) => raw.WritingToolsConfiguration(rect: c.rect, text: c.text),
               _ => null,
             },
             fallback: () {
@@ -267,6 +268,9 @@ class DesktopContextMenuWidget extends StatelessWidget {
             });
         final res = await menuContext.showContextMenu(request);
         onHideMenu.value = res;
+        if (res.itemSelected == false) {
+          onMenuClosed?.call();
+        }
       } else {
         onMenuResolved(false);
       }
